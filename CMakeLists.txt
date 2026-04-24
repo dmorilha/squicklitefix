@@ -52,6 +52,7 @@ include(QuickfixPrebuildSetup)
 option(HAVE_SSL "Build with SSL")
 option(HAVE_MYSQL "Build with MySQL")
 option(HAVE_POSTGRESQL "Build with PostgreSQL")
+option(HAVE_SQLITE3 "Build with SQLite3 support")
 option(HAVE_ODBC "Build with ODBC")
 option(HAVE_PYTHON3 "Build with default Python3 version")
 
@@ -87,6 +88,13 @@ find_package(PostgreSQL REQUIRED)
 include_directories(${PostgreSQL_INCLUDE_DIRS})
 
 message("-- Building with POSTGRESQL")
+endif()
+
+if(HAVE_SQLITE3)
+find_package(SQLite3 REQUIRED)
+include_directories(${SQLite3_INCLUDE_DIR})
+
+message("-- Building with SQLite3")
 endif()
 
 if(HAVE_ODBC)

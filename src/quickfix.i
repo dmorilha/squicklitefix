@@ -111,6 +111,14 @@ namespace std
 #include <PostgreSQLStubs.h>
 #endif
 
+#ifdef HAVE_SQLITE3
+#include <SQLite3Connection.h>
+#include <SQLite3Store.h>
+#include <SQLite3Log.h>
+#else
+#include <SQLite3Stubs.h>
+#endif
+
 #include <functional>
 #ifdef SWIGPYTHON
 #include "datetime.h"

@@ -26,6 +26,7 @@ if (QUICKFIX_TESTS)
   ${PROJECT_SOURCE_DIR}/src/C++/test/OdbcStoreTestCase.cpp
   ${PROJECT_SOURCE_DIR}/src/C++/test/ParserTestCase.cpp
   ${PROJECT_SOURCE_DIR}/src/C++/test/PostgreSQLStoreTestCase.cpp
+  ${PROJECT_SOURCE_DIR}/src/C++/test/SQLiteStoreTestCase.cpp
   ${PROJECT_SOURCE_DIR}/src/C++/test/SessionFactoryTestCase.cpp
   ${PROJECT_SOURCE_DIR}/src/C++/test/SessionIDTestCase.cpp
   ${PROJECT_SOURCE_DIR}/src/C++/test/SessionSettingsTestCase.cpp

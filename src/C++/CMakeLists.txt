@@ -40,6 +40,9 @@ set(quickfix_SOURCES
   SessionFactory.cpp
   SessionSettings.cpp
   Settings.cpp
+  SQLiteConnection.cpp
+  SQLiteLog.cpp
+  SQLiteStore.cpp
   SocketAcceptor.cpp
   SocketConnection.cpp
   SocketConnector.cpp
@@ -73,14 +76,14 @@ endif()
 if (WIN32)
   add_library(${PROJECT_NAME} STATIC  ${quickfix_SOURCES})
   set_target_properties (${PROJECT_NAME} PROPERTIES DEBUG_POSTFIX d)
-  target_link_libraries(${PROJECT_NAME} ${OPENSSL_LIBRARIES} ${MYSQL_CLIENT_LIBS} ${PostgreSQL_LIBRARIES} ws2_32 crypt32)
+  target_link_libraries(${PROJECT_NAME} ${OPENSSL_LIBRARIES} ${MYSQL_CLIENT_LIBS} ${PostgreSQL_LIBRARIES} ${SQLite3_LIBRARIES} ws2_32 crypt32)
 else()
    if (QUICKFIX_SHARED_LIBS)
 	   add_library(${PROJECT_NAME} SHARED  ${quickfix_SOURCES})
    else()
 	   add_library(${PROJECT_NAME} STATIC  ${quickfix_SOURCES})
   endif()
-  target_link_libraries(${PROJECT_NAME} ${OPENSSL_LIBRARIES} ${MYSQL_CLIENT_LIBS} ${PostgreSQL_LIBRARIES} ${ODBC_LIBRARIES} pthread)
+  target_link_libraries(${PROJECT_NAME} ${OPENSSL_LIBRARIES} ${MYSQL_CLIENT_LIBS} ${PostgreSQL_LIBRARIES} ${SQLite3_LIBRARIES} ${ODBC_LIBRARIES} pthread)
 endif()
 
 include(CheckFunctionExists)
