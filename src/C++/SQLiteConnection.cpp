@@ -7,9 +7,18 @@
 #endif
 
 #ifdef HAVE_SQLITE3
+#include <mutex>
+
 #include "SQLiteConnection.h"
 
 namespace FIX {
+/* SQLiteStatement */
+
+SQLiteStatement::~SQLiteStatement() {
+  sqlite3_free(m_Statement);
+  m_Statement = nullptr;
+}
+
 /* SQLiteQuery */
 SQLiteQuery::~SQLiteQuery() {
   sqlite3_finalize(m_statement);
@@ -17,7 +26,11 @@ SQLiteQuery::~SQLiteQuery() {
 }
 
 SQLiteQuery::SQLiteQuery(const std::string &query) :
-  m_statement(nullptr), m_query(query) { }
+  m_query(query) { }
+
+SQLiteQuery::SQLiteQuery(const char *query) :
+  m_query(query) { }
+
 
 bool SQLiteQuery::execute(sqlite3 *pConnection) {
   /* does this return any error? */
@@ -27,7 +40,6 @@ bool SQLiteQuery::execute(sqlite3 *pConnection) {
   }
   m_status = sqlite3_errcode(pConnection);
   m_reason = sqlite3_errmsg(pConnection);
-
   return success();
 }
 
@@ -83,17 +95,18 @@ SQLiteConnection::SQLiteConnection(const std::string &database) {
 }
 
 bool SQLiteConnection::execute(SQLiteQuery &query) {
-  /* should it lock ? */
+  std::shared_lock lock(m_pMutex);
   return query.execute(m_pConnection);
 }
 
-bool SQLiteConnection::execute(const char *statement) {
-  /* should it lock ? */
-  char *error = nullptr;
-  const int result = sqlite3_exec(m_pConnection, statement, nullptr, nullptr, &error);
-  if (nullptr != error) {
-    sqlite3_free(error);
-    error = nullptr;
+bool SQLiteConnection::execute(const char *statement, std::string &error) {
+  std::unique_lock lock(m_pMutex);
+  char *error_string = nullptr;
+  const int result = sqlite3_exec(m_pConnection, statement, nullptr, nullptr, &error_string);
+  if (nullptr != error_string) {
+    error = error_string;
+    sqlite3_free(error_string);
+    error_string = nullptr;
   }
   return SQLITE_OK == result;
 }

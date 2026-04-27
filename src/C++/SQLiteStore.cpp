@@ -42,27 +42,26 @@ SQLiteStore::SQLiteStore(const UtcTimeStamp &now, const SessionID &sessionID, co
 
 bool SQLiteStore::set(SEQNUM msgSeqNum, const std::string &msg) EXCEPT(IOException) {
   const long long sequenceNumber = msgSeqNum ^ 0x8000000000000000;
-  char * const statement = sqlite3_mprintf("INSERT INTO messages (beginstring, sendercompid, targetcompid, session_qualifier, msgseqnum, message) VALUES ('%q', '%q', '%q', '%q', %lld, '%q');",
+  std::string error;
+  auto statement = SQLiteStatement::create("INSERT INTO messages (beginstring, sendercompid, targetcompid, session_qualifier, msgseqnum, message) VALUES ('%q', '%q', '%q', '%q', %lld, '%q');",
       m_sessionID.getBeginString().getValue().c_str(),
       m_sessionID.getSenderCompID().getValue().c_str(),
       m_sessionID.getTargetCompID().getValue().c_str(),
       m_sessionID.getSessionQualifier().c_str(),
       sequenceNumber, msg.c_str());
 
-  if (!m_pConnection->execute(statement)) {
-    char * const statement = sqlite3_mprintf("UPDATE messages SET message='%q' WHERE beginstring='%q' AND snedercompid='%q' AND targetcompid='%q' AND session_qualifier='%q' AND msgseqnum=%lld;",
+  if (!m_pConnection->execute(statement, error)) {
+    auto statement = SQLiteStatement::create("UPDATE messages SET message='%q' WHERE beginstring='%q' AND snedercompid='%q' AND targetcompid='%q' AND session_qualifier='%q' AND msgseqnum=%lld;",
         msg.c_str(),
         m_sessionID.getBeginString().getValue().c_str(),
         m_sessionID.getSenderCompID().getValue().c_str(),
         m_sessionID.getTargetCompID().getValue().c_str(),
         m_sessionID.getSessionQualifier().c_str(),
         sequenceNumber);
-    if (!m_pConnection->execute(statement)) {
-      /* error */
+    if (!m_pConnection->execute(statement, error)) {
+      throw IOException("Insertion and update failed " + error);
     }
-    sqlite3_free(reinterpret_cast<void *>(statement));
   }
-  sqlite3_free(reinterpret_cast<void *>(statement));
   return true;
 }
 
@@ -70,14 +69,13 @@ void SQLiteStore::get(SEQNUM begin, SEQNUM end, std::vector<std::string> &result
   const long begin_ = begin ^ 0x8000000000000000,
         end_ = end ^ 0x8000000000000000;
   result.clear();
-  char * const queryString = sqlite3_mprintf("SELECT message FROM messages WHERE beginstring='%q' AND sendercompid='%q' AND targetcompid='%q' AND session_qualifier='%q' AND msgseqnum>=%lld AND msgseqnum<=%lld ORDER BY msgseqnum;",
+  auto queryString = SQLiteStatement::create("SELECT message FROM messages WHERE beginstring='%q' AND sendercompid='%q' AND targetcompid='%q' AND session_qualifier='%q' AND msgseqnum>=%lld AND msgseqnum<=%lld ORDER BY msgseqnum;",
       m_sessionID.getBeginString().getValue().c_str(),
       m_sessionID.getSenderCompID().getValue().c_str(),
       m_sessionID.getTargetCompID().getValue().c_str(),
       m_sessionID.getSessionQualifier().c_str(),
       begin_, end_);
   SQLiteQuery query(queryString);
-  sqlite3_free(reinterpret_cast<void*>(queryString));
   if (!m_pConnection->execute(query)) {
     query.throwException();
   }
@@ -89,31 +87,31 @@ void SQLiteStore::get(SEQNUM begin, SEQNUM end, std::vector<std::string> &result
 
 void SQLiteStore::setNextSenderMsgSeqNum(SEQNUM value) EXCEPT(IOException) {
   const long value_ = value ^ 0x8000000000000000;
-  char * const queryString = sqlite3_mprintf("UPDATE sessions SET outgoing_seqnum=%lld WHERE beginstring='%q' AND sendercompid='%q' AND targetcompid='%q' AND session_qualifier='%q';",
+  auto queryString = SQLiteStatement::create("UPDATE sessions SET outgoing_seqnum=%lld WHERE beginstring='%q' AND sendercompid='%q' AND targetcompid='%q' AND session_qualifier='%q';",
     value_,
     m_sessionID.getBeginString().getValue().c_str(),
     m_sessionID.getSenderCompID().getValue().c_str(),
     m_sessionID.getTargetCompID().getValue().c_str(),
     m_sessionID.getSessionQualifier().c_str());
-  if (!m_pConnection->execute(queryString)) {
-    /* error */
+  std::string error;
+  if (!m_pConnection->execute(queryString, error)) {
+    throw IOException("Update failed " + error);
   }
-  sqlite3_free(reinterpret_cast<void*>(queryString));
   m_cache.setNextSenderMsgSeqNum(value);
 }
 
 void SQLiteStore::setNextTargetMsgSeqNum(SEQNUM value) EXCEPT(IOException) {
   const long value_ = value ^ 0x8000000000000000;
-  char * const queryString = sqlite3_mprintf("UPDATE sessions SET incoming_seqnum=%lld WHERE beginstring='%q' AND sendercompid='%q' AND targetcompid='%q' AND session_qualifier='%q';",
+  auto queryString = SQLiteStatement::create("UPDATE sessions SET incoming_seqnum=%lld WHERE beginstring='%q' AND sendercompid='%q' AND targetcompid='%q' AND session_qualifier='%q';",
     value_,
     m_sessionID.getBeginString().getValue().c_str(),
     m_sessionID.getSenderCompID().getValue().c_str(),
     m_sessionID.getTargetCompID().getValue().c_str(),
     m_sessionID.getSessionQualifier().c_str());
-  if (!m_pConnection->execute(queryString)) {
-    /* error */
+  std::string error;
+  if (!m_pConnection->execute(queryString, error)) {
+    throw IOException("Update failed " + error);
   }
-  sqlite3_free(reinterpret_cast<void*>(queryString));
   m_cache.setNextTargetMsgSeqNum(value);
 }
 
@@ -130,15 +128,15 @@ void SQLiteStore::incrNextTargetMsgSeqNum() EXCEPT(IOException) {
 UtcTimeStamp SQLiteStore::getCreationTime() const EXCEPT(IOException) { return m_cache.getCreationTime(); }
 
 void SQLiteStore::reset(const UtcTimeStamp &now) EXCEPT(IOException) {
-  char * const queryString = sqlite3_mprintf("DELETE FROM messages WHERE beginstring='%q' AND sendercompid='%q' AND targetcompid='%q' AND session_qualifier='%q';", 
+  auto queryString = SQLiteStatement::create("DELETE FROM messages WHERE beginstring='%q' AND sendercompid='%q' AND targetcompid='%q' AND session_qualifier='%q';", 
       m_sessionID.getBeginString().getValue().c_str(),
       m_sessionID.getSenderCompID().getValue().c_str(),
       m_sessionID.getTargetCompID().getValue().c_str(),
       m_sessionID.getSessionQualifier().c_str());
-  if (!m_pConnection->execute(queryString)) {
-    /* error */
+  std::string error;
+  if (!m_pConnection->execute(queryString, error)) {
+    throw IOException("Delete failed " + error);
   }
-  sqlite3_free(reinterpret_cast<void*>(queryString));
   m_cache.reset(now);
   UtcTimeStamp time = m_cache.getCreationTime();
 
@@ -151,7 +149,7 @@ void SQLiteStore::reset(const UtcTimeStamp &now) EXCEPT(IOException) {
   const long incoming_seqnum = m_cache.getNextTargetMsgSeqNum() ^ 0x8000000000000000,
     outgoing_seqnum = m_cache.getNextSenderMsgSeqNum() ^ 0x8000000000000000;
 
-  char * const queryString2 = sqlite3_mprintf("UPDATE sessions SET creation_time='%q', incoming_seqnum=%lld, outgoing_seqnum=%lld WHERE beginstring='%q' AND sendercompid='%q' AND targetcompid='%q' AND session_qualifier='%q';",
+  auto queryString2 = SQLiteStatement::create("UPDATE sessions SET creation_time='%q', incoming_seqnum=%lld, outgoing_seqnum=%lld WHERE beginstring='%q' AND sendercompid='%q' AND targetcompid='%q' AND session_qualifier='%q';",
       sqlTime,
       incoming_seqnum,
       outgoing_seqnum,
@@ -159,11 +157,9 @@ void SQLiteStore::reset(const UtcTimeStamp &now) EXCEPT(IOException) {
       m_sessionID.getSenderCompID().getValue().c_str(),
       m_sessionID.getTargetCompID().getValue().c_str(),
       m_sessionID.getSessionQualifier().c_str());
-
-  if (!m_pConnection->execute(queryString2)) {
-    /* error */
+  if (!m_pConnection->execute(queryString2, error)) {
+    throw IOException("Update failed " + error);
   }
-  sqlite3_free(reinterpret_cast<void*>(queryString2));
 }
 
 void SQLiteStore::refresh() EXCEPT(IOException) {
@@ -184,8 +180,9 @@ void SQLiteStore::createTables() {
         "outgoing_seqnum INTEGER NOT NULL,"
         "PRIMARY KEY (beginstring, sendercompid, targetcompid, session_qualifier)"
       ");";
-    if (!m_pConnection->execute(queryString)) {
-      /* error */
+    std::string error;
+    if (!m_pConnection->execute(queryString, error)) {
+      throw IOException("Table creation failed " + error);
     }
   }
   {
@@ -199,21 +196,20 @@ void SQLiteStore::createTables() {
         "message BLOB NOT NULL,"
         "PRIMARY KEY (beginstring, sendercompid, targetcompid, session_qualifier, msgseqnum)"
       ");";
-    if (!m_pConnection->execute(queryString)) {
-      /* error */
+    std::string error;
+    if (!m_pConnection->execute(queryString, error)) {
+      throw IOException("Table creation failed " + error);
     }
   }
 }
 
 void SQLiteStore::populateCache() {
-  char * const queryString = sqlite3_mprintf("SELECT creation_time, incoming_seqnum, outgoing_seqnum FROM sessions WHERE beginstring='%q' AND sendercompid='%q' AND targetcompid='%q' AND session_qualifier='%q';",
+  auto queryString = SQLiteStatement::create("SELECT creation_time, incoming_seqnum, outgoing_seqnum FROM sessions WHERE beginstring='%q' AND sendercompid='%q' AND targetcompid='%q' AND session_qualifier='%q';",
       m_sessionID.getBeginString().getValue().c_str(),
       m_sessionID.getSenderCompID().getValue().c_str(),
       m_sessionID.getTargetCompID().getValue().c_str(),
       m_sessionID.getSessionQualifier().c_str());
-
   SQLiteQuery query(queryString);
-  sqlite3_free(reinterpret_cast<void*>(queryString));
   if (!m_pConnection->execute(query)) {
     throw ConfigError("Unable to query sessions table");
   }
@@ -243,7 +239,7 @@ void SQLiteStore::populateCache() {
     STRING_SPRINTF(sqlTime, "%d-%02d-%02d %02d:%02d:%02d", year, month, day, hour, minute, second);
     const long incoming_seqnum = m_cache.getNextTargetMsgSeqNum() ^ 0x8000000000000000,
       outgoing_seqnum = m_cache.getNextTargetMsgSeqNum() ^ 0x8000000000000000;
-    char * const queryString2 = sqlite3_mprintf("INSERT INTO sessions (beginstring, sendercompid, targetcompid, session_qualifier, creation_time, incoming_seqnum, outgoing_seqnum) VALUES ('%q', '%q', '%q', '%q', '%q', %lld, %lld);",
+    auto queryString2 = SQLiteStatement::create("INSERT INTO sessions (beginstring, sendercompid, targetcompid, session_qualifier, creation_time, incoming_seqnum, outgoing_seqnum) VALUES ('%q', '%q', '%q', '%q', '%q', %lld, %lld);",
         m_sessionID.getBeginString().getValue().c_str(),
         m_sessionID.getSenderCompID().getValue().c_str(),
         m_sessionID.getTargetCompID().getValue().c_str(),
@@ -251,11 +247,10 @@ void SQLiteStore::populateCache() {
         sqlTime,
         incoming_seqnum,
         outgoing_seqnum);
-
-    if (!m_pConnection->execute(queryString2)) {
-      /* error */ // throw ConfigError("Unable to create session in database");
+    std::string error;
+    if (!m_pConnection->execute(queryString2, error)) {
+      throw ConfigError("Unable to create session in database " + error);
     }
-    sqlite3_free(reinterpret_cast<void*>(queryString2));
   }
 }
 

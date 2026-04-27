@@ -78,8 +78,9 @@ void SQLiteLog::createTable(const std::string &tableName) {
     "session_qualifier TEXT,"
     "text BLOB NOT NULL"
     ");";
-  if (!m_pConnection->execute(queryString.str().c_str())) {
-    /* error */
+  std::string error;
+  if (!m_pConnection->execute(queryString.str().c_str(), error)) {
+    throw IOException("Table creation failed " + error);
   }
 }
 
@@ -122,10 +123,10 @@ void SQLiteLog::insert(const std::string &table, const std::string &value) {
     queryString << "NULL, NULL, NULL, NULL, ";
   }
 
-  char * const valueCopy = sqlite3_mprintf("'%q');", value.c_str());
-  queryString << valueCopy;
-  sqlite3_free(reinterpret_cast<void*>(valueCopy));
-
+  {
+    auto valueCopy = SQLiteStatement::create("'%q');", value.c_str());
+    queryString << valueCopy;
+  }
   SQLiteQuery query(queryString.str());
   m_pConnection->execute(query);
 }
